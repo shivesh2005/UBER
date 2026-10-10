@@ -82,8 +82,95 @@ Invalid request (`400 Bad Request`):
 }
 ```
 
-> These examples illustrate a possible response format; the current controller
-> does not define a response body.
+## Log in a user
 
-> **Implementation note:** The current `registerUser` controller is empty, so
-> this endpoint does not yet implement these responses or complete registration.
+Authenticates an existing user using their email address and password. On
+success, the endpoint returns an authentication token and the user document.
+
+### Endpoint
+
+```http
+POST /users/login
+Content-Type: application/json
+```
+
+The app mounts user routes at `/users`, making the full path `/users/login`
+(plural), rather than `/user/login`.
+
+### Request body
+
+| Field | Type | Required | Requirements |
+| --- | --- | --- | --- |
+| `email` | string | Yes | Must be a valid email address |
+| `password` | string | Yes | At least 6 characters |
+
+Example:
+
+```json
+{
+  "email": "alex.morgan@example.com",
+  "password": "secure123"
+}
+```
+
+### Status codes
+
+| Status | Meaning |
+| --- | --- |
+| `200 OK` | Login succeeded; the response contains an authentication token and user. |
+| `400 Bad Request` | The email is invalid or the password is shorter than 6 characters. |
+| `401 Unauthorized` | The password does not match the account. |
+| `404 Not Found` | No account exists for the submitted email address. |
+
+### Example responses
+
+Successful login (`200 OK`):
+
+```json
+{
+  "token": "<authentication-token>",
+  "user": {
+    "_id": "66f123abc4567890def12345",
+    "fullName": {
+      "firstName": "Alex",
+      "lastName": "Morgan"
+    },
+    "email": "alex.morgan@example.com"
+  }
+}
+```
+
+Invalid request (`400 Bad Request`):
+
+```json
+{
+  "errors": [
+    {
+      "msg": "Invalid Email",
+      "path": "email",
+      "location": "body"
+    }
+  ]
+}
+```
+
+Unknown email (`404 Not Found`):
+
+```json
+{
+  "message": "User not found"
+}
+```
+
+Incorrect password (`401 Unauthorized`):
+
+```json
+{
+  "message": "Invalid Password"
+}
+```
+
+> **Implementation note:** The login controller selects the stored password
+> hash and returns the user document directly. As currently implemented, the
+> response may include that hash; it should be removed from the response before
+> exposing this endpoint to clients.
