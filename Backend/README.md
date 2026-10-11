@@ -174,3 +174,72 @@ Incorrect password (`401 Unauthorized`):
 > hash and returns the user document directly. As currently implemented, the
 > response may include that hash; it should be removed from the response before
 > exposing this endpoint to clients.
+
+## Get the current user's profile
+
+Returns the authenticated user's profile. Provide the JWT in the
+`Authorization` header using the standard scheme-plus-token format shown
+below, or store it in the `token` cookie.
+
+### Endpoint
+
+```http
+GET /users/profile
+Authorization: <Bearer-scheme> <JWT>
+```
+
+Alternatively, send the JWT in a `token` cookie. No request body is required.
+
+### Status codes
+
+| Status | Meaning |
+| --- | --- |
+| `200 OK` | The authenticated user's profile is returned. |
+| `401 Unauthorized` | The token is missing or invalid, or the token's user no longer exists. |
+
+### Example response
+
+```json
+{
+  "_id": "66f123abc4567890def12345",
+  "fullName": {
+    "firstName": "Alex",
+    "lastName": "Morgan"
+  },
+  "email": "alex.morgan@example.com"
+}
+```
+
+## Log out a user
+
+Logs out the authenticated user by adding the current token to the token
+blacklist and clearing the `token` cookie.
+
+### Endpoint
+
+```http
+POST /users/logout
+Authorization: <Bearer-scheme> <JWT>
+```
+
+Alternatively, send the JWT in a `token` cookie. No request body is required.
+
+### Status codes
+
+| Status | Meaning |
+| --- | --- |
+| `200 OK` | Logout succeeded; the token cookie is cleared. |
+| `401 Unauthorized` | The token is missing or invalid, or the token's user no longer exists. |
+
+### Example response
+
+```json
+{
+  "message": "Logged out successfully"
+}
+```
+
+> **Implementation note:** `logoutUser` reads `req.token`, but the current
+> authentication middleware does not set that property (it sets `req.user`).
+> As a result, token blacklisting may fail until the middleware passes the
+> authenticated token to the controller.

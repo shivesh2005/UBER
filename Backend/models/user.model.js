@@ -40,7 +40,9 @@ userSchema.methods.generateAuthTokens = function () {
         { id: this._id },
         process.env.JWT_SECRET,
         { expiresIn: '1d' }
+       
     );
+    return Token;
 };
 
 userSchema.methods.comparePassword = async function (password) {
