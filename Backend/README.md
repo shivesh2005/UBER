@@ -243,3 +243,75 @@ Alternatively, send the JWT in a `token` cookie. No request body is required.
 > authentication middleware does not set that property (it sets `req.user`).
 > As a result, token blacklisting may fail until the middleware passes the
 > authenticated token to the controller.
+
+## Captain API
+
+### Routes and controller
+
+Captain endpoints are not currently available. The Captain route and controller
+files are empty, and the application does not mount a Captain router. Therefore,
+there are no Captain URLs, request bodies, or endpoint status codes to document
+yet.
+
+### Captain data model
+
+The Captain model describes these fields. These are model requirements, not
+the request requirements of an active endpoint:
+
+| Field | Type | Required | Constraints / behavior |
+| --- | --- | --- | --- |
+| `fullName.firstName` | string | Yes | At least 3 characters |
+| `fullName.lastName` | string | Yes | At least 3 characters |
+| `email` | string | Yes | Unique, converted to lowercase, and must match an email-like pattern |
+| `socketId` | string | No | No additional validation specified |
+| `status` | string | No | `active` or `inactive`; defaults to `inactive` |
+| `vehicle.color` | string | Yes | At least 3 characters |
+| `vehicle.plate` | string | Yes | At least 3 characters |
+| `vehicle.model` | string | Yes | At least 3 characters |
+| `vehicle.capacity` | number | Yes | Minimum value is 1 |
+| `vehicle.vehicleType` | string | Yes | Must be `car`, `bike`, or `van` |
+| `location.lat` | number | No | No range validation specified |
+| `location.long` | number | No | No range validation specified |
+
+Example document shape based on the model:
+
+```json
+{
+  "fullName": {
+    "firstName": "Alex",
+    "lastName": "Morgan"
+  },
+  "email": "alex.morgan@example.com",
+  "status": "inactive",
+  "vehicle": {
+    "color": "Blue",
+    "plate": "ABC123",
+    "model": "Sedan",
+    "capacity": 4,
+    "vehicleType": "car"
+  },
+  "location": {
+    "lat": 37.7749,
+    "long": -122.4194
+  }
+}
+```
+
+### Model methods and implementation notes
+
+- `generateAuthTokens()` creates a JWT containing the captain document ID with
+  a one-day expiry.
+- `comparePassword(password)` is intended to compare a supplied password with
+  `this.password` using bcrypt. The current schema does not define a `password`
+  field or a password-hashing method, so this method is not usable as written.
+- The route and controller files do not define registration, login, profile, or
+  logout behavior for captains.
+- The model currently has blocking naming/import issues: it imports
+  `'/mongoose'` rather than the installed `mongoose` package and registers
+  `CaptainSchema` although the schema variable is named `captainSchema`.
+- The JWT method currently passes the literal string
+  `'process.env.JWT_SECRET'` as its signing secret. It does not read the
+  `JWT_SECRET` environment variable as intended.
+
+These implementation issues must be fixed before the documented model methods
+can be relied on by Captain endpoints.
