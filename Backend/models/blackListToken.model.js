@@ -1,14 +1,21 @@
+
 const mongoose = require('mongoose');
+
 const blackListTokenSchema = new mongoose.Schema({
   token: {
     type: String,
     required: true,
     unique: true
   },
-  createdAt:{
+
+  createdAt: {
     type: Date,
     default: Date.now,
-    expires: 86400
+    expires: 86400 // Delete the entry after 24 hours
   }
 });
-module.exports = mongoose.model('BlackListToken', blackListTokenSchema);
+
+module.exports = mongoose.model(
+  'BlackListToken',
+  blackListTokenSchema
+);

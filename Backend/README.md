@@ -239,41 +239,47 @@ Alternatively, send the JWT in a `token` cookie. No request body is required.
 }
 ```
 
-> **Implementation note:** `logoutUser` reads `req.token`, but the current
-> authentication middleware does not set that property (it sets `req.user`).
-> As a result, token blacklisting may fail until the middleware passes the
-> authenticated token to the controller.
+The shared authentication middleware sets both `req.user` and `req.token` for
+authenticated user requests; the logout controller uses the token to add it to
+the shared blacklist.
 
 ## Captain API
 
-### Routes and controller
+Captain routes and handlers are defined in the route, controller, middleware,
+service, and model files described below. **They are not currently reachable
+through the running app:** [app.js](./app.js) mounts only `/users`, not a
+Captain router. Also, the Captain route module imports
+`../controllers/captain.controller`, while the controller file in the
+repository is named `capatain.controllers.js`. Fix the filename/import mismatch
+and mount the router before using these endpoints. The paths below describe
+the route declarations assuming the router is mounted at `/captains`.
 
-Captain endpoints are not currently available. The Captain route and controller
-files are empty, and the application does not mount a Captain router. Therefore,
-there are no Captain URLs, request bodies, or endpoint status codes to document
-yet.
+### Captain registration
 
-### Captain data model
+```http
+POST /captains/register
+Content-Type: application/json
+```
 
-The Captain model describes these fields. These are model requirements, not
-the request requirements of an active endpoint:
+Creates a Captain account, hashes the password through the model's pre-save
+hook, sets an authentication cookie, and returns an authentication token and
+Captain data without the password.
 
-| Field | Type | Required | Constraints / behavior |
+#### Request body
+
+| Field | Type | Required | Validation |
 | --- | --- | --- | --- |
-| `fullName.firstName` | string | Yes | At least 3 characters |
-| `fullName.lastName` | string | Yes | At least 3 characters |
-| `email` | string | Yes | Unique, converted to lowercase, and must match an email-like pattern |
-| `socketId` | string | No | No additional validation specified |
-| `status` | string | No | `active` or `inactive`; defaults to `inactive` |
-| `vehicle.color` | string | Yes | At least 3 characters |
-| `vehicle.plate` | string | Yes | At least 3 characters |
-| `vehicle.model` | string | Yes | At least 3 characters |
-| `vehicle.capacity` | number | Yes | Minimum value is 1 |
-| `vehicle.vehicleType` | string | Yes | Must be `car`, `bike`, or `van` |
-| `location.lat` | number | No | No range validation specified |
-| `location.long` | number | No | No range validation specified |
+| `fullName.firstName` | string | Yes | Trimmed, at least 3 characters |
+| `fullName.lastName` | string | Yes | Trimmed, at least 3 characters |
+| `email` | string | Yes | Valid email; normalized to lowercase and trimmed |
+| `password` | string | Yes | At least 6 characters |
+| `vehicle.color` | string | Yes | Trimmed, at least 3 characters |
+| `vehicle.plate` | string | Yes | Trimmed, at least 3 characters |
+| `vehicle.capacity` | integer | Yes | At least 1 |
+| `vehicle.model` | string | Yes | Trimmed, at least 3 characters |
+| `vehicle.vehicleType` | string | Yes | One of `car`, `bike`, `van` |
 
-Example document shape based on the model:
+Example:
 
 ```json
 {
@@ -282,36 +288,209 @@ Example document shape based on the model:
     "lastName": "Morgan"
   },
   "email": "alex.morgan@example.com",
-  "status": "inactive",
+  "password": "secure123",
   "vehicle": {
     "color": "Blue",
     "plate": "ABC123",
-    "model": "Sedan",
     "capacity": 4,
+    "model": "Sedan",
     "vehicleType": "car"
-  },
-  "location": {
-    "lat": 37.7749,
-    "long": -122.4194
   }
 }
 ```
 
-### Model methods and implementation notes
+#### Responses
 
-- `generateAuthTokens()` creates a JWT containing the captain document ID with
-  a one-day expiry.
-- `comparePassword(password)` is intended to compare a supplied password with
-  `this.password` using bcrypt. The current schema does not define a `password`
-  field or a password-hashing method, so this method is not usable as written.
-- The route and controller files do not define registration, login, profile, or
-  logout behavior for captains.
-- The model currently has blocking naming/import issues: it imports
-  `'/mongoose'` rather than the installed `mongoose` package and registers
-  `CaptainSchema` although the schema variable is named `captainSchema`.
-- The JWT method currently passes the literal string
-  `'process.env.JWT_SECRET'` as its signing secret. It does not read the
-  `JWT_SECRET` environment variable as intended.
+| Status | Meaning |
+| --- | --- |
+| `201 Created` | Captain was created; response includes `message`, `token`, and `captain`. Also sets the `token` cookie. |
+| `400 Bad Request` | One or more request fields failed route validation; response contains an `errors` array. |
+| `409 Conflict` | Email is already registered. |
 
-These implementation issues must be fixed before the documented model methods
-can be relied on by Captain endpoints.
+Example success response:
+
+```json
+{
+  "message": "Captain registered successfully",
+  "token": "<authentication-token>",
+  "captain": {
+    "_id": "66f123abc4567890def12345",
+    "fullName": {
+      "firstName": "Alex",
+      "lastName": "Morgan"
+    },
+    "email": "alex.morgan@example.com",
+    "status": "inactive",
+    "vehicle": {
+      "color": "Blue",
+      "plate": "ABC123",
+      "capacity": 4,
+      "model": "Sedan",
+      "vehicleType": "car"
+    }
+  }
+}
+```
+
+### Captain login
+
+```http
+POST /captains/login
+Content-Type: application/json
+```
+
+Authenticates by email and password. Email is lowercased and trimmed for the
+lookup. A successful login sets the `token` cookie and returns the token and
+Captain data without the password.
+
+#### Request body
+
+| Field | Type | Required | Validation |
+| --- | --- | --- | --- |
+| `email` | string | Yes | Must be a valid email |
+| `password` | string | Yes | Must not be empty |
+
+Example:
+
+```json
+{
+  "email": "alex.morgan@example.com",
+  "password": "secure123"
+}
+```
+
+#### Responses
+
+| Status | Meaning |
+| --- | --- |
+| `200 OK` | Login succeeded; response includes `message`, `token`, and `captain`; sets the `token` cookie. |
+| `400 Bad Request` | Email or password validation failed; response contains an `errors` array. |
+| `401 Unauthorized` | Email was not found or password did not match. |
+
+Example invalid-credentials response:
+
+```json
+{
+  "message": "Invalid email or password"
+}
+```
+
+### Get Captain profile
+
+```http
+GET /captains/profile
+Authorization: Bearer <JWT>
+```
+
+The JWT may alternatively be supplied in the `token` cookie. No request body
+is required. Authentication validates the JWT, rejects blacklisted tokens, and
+loads the Captain document.
+
+| Status | Meaning |
+| --- | --- |
+| `200 OK` | Response contains the authenticated Captain as `captain`, excluding the password. |
+| `401 Unauthorized` | Token is missing, invalid, expired, blacklisted, or does not identify an existing Captain. |
+| `404 Not Found` | The profile handler could not find the Captain. |
+
+Example response:
+
+```json
+{
+  "captain": {
+    "_id": "66f123abc4567890def12345",
+    "fullName": {
+      "firstName": "Alex",
+      "lastName": "Morgan"
+    },
+    "email": "alex.morgan@example.com",
+    "status": "inactive",
+    "vehicle": {
+      "color": "Blue",
+      "plate": "ABC123",
+      "capacity": 4,
+      "model": "Sedan",
+      "vehicleType": "car"
+    }
+  }
+}
+```
+
+### Captain logout
+
+```http
+POST /captains/logout
+Authorization: Bearer <JWT>
+```
+
+The JWT may alternatively be supplied in the `token` cookie. No request body
+is required. Logout adds the token to the blacklist and clears the `token`
+cookie.
+
+| Status | Meaning |
+| --- | --- |
+| `200 OK` | Logout succeeded; response is `{"message":"Captain logged out successfully"}`. |
+| `401 Unauthorized` | Token is missing, invalid, expired, blacklisted, or does not identify an existing Captain. |
+
+### Authentication and cookies
+
+- Captain registration and login issue a JWT signed with the `JWT_SECRET`
+  environment variable, with a one-day expiry.
+- Successful registration and login set an HTTP-only `token` cookie with
+  `SameSite=Lax` and a 24-hour max age. The cookie's `Secure` flag is enabled
+  when `NODE_ENV=production`. The token is also returned in the JSON body.
+- Protected endpoints accept `Authorization: Bearer <JWT>` or the `token`
+  cookie. If both are provided, the Bearer token takes precedence.
+- Missing, invalid, expired, or blacklisted tokens are rejected with `401`.
+- `JWT_SECRET` must be configured in the environment for signing and
+  verification.
+
+### Captain model and service
+
+The `captain.service.js` service creates a Captain document from `fullName`,
+`email`, `password`, and `vehicle`. It requires all four values, persists only
+the named fields, and normalizes email by trimming and lowercasing it.
+
+The Mongoose Captain model defines:
+
+| Field | Type | Required | Constraints / defaults |
+| --- | --- | --- | --- |
+| `fullName.firstName` | string | Yes | At least 3 characters |
+| `fullName.lastName` | string | Yes | At least 3 characters |
+| `email` | string | Yes | Unique, lowercase, trimmed, and validated as an email |
+| `password` | string | Yes | Not selected in queries by default; hashed with bcrypt before saving |
+| `socketId` | string | No | Defaults to `null` |
+| `status` | string | No | `active` or `inactive`; defaults to `inactive` |
+| `vehicle.color` | string | Yes | At least 3 characters |
+| `vehicle.plate` | string | Yes | At least 3 characters |
+| `vehicle.model` | string | Yes | At least 3 characters |
+| `vehicle.capacity` | number | Yes | Minimum 1 |
+| `vehicle.vehicleType` | string | Yes | `car`, `bike`, or `van` |
+| `location.lat` | number | No | No range validation |
+| `location.long` | number | No | No range validation |
+| `createdAt`, `updatedAt` | date | Generated | Added by Mongoose timestamps |
+
+The model provides `hashPassword(password)`, `comparePassword(password)`, and
+`generateAuthToken()` methods. Generated JWTs contain the Captain document ID
+and expire after one day.
+
+### Token blacklist
+
+The shared `BlackListToken` model stores a unique required token and a
+`createdAt` timestamp. MongoDB TTL expiration removes blacklist entries after
+24 hours, matching the JWT lifetime. Both user and Captain auth middleware
+reject tokens found in this collection.
+
+### Source-file responsibilities
+
+| File | Responsibility |
+| --- | --- |
+| `routes/capatain.routes.js` | Declares registration, login, protected profile, and protected logout routes, including request validators. |
+| `controllers/capatain.controllers.js` | Implements registration, login, profile, and logout responses and cookie handling. |
+| `middlewares/auth.middleware.js` | Extracts Bearer/cookie tokens, verifies JWT and blacklist status, loads the user/Captain, and attaches identity and token to the request. |
+| `service/captain.service.js` | Validates required registration groups and creates normalized Captain records. |
+| `models/captain.model.js` | Defines Captain data constraints, password hashing/comparison, and JWT generation. |
+| `models/blackListToken.model.js` | Stores revoked tokens and expires them after 24 hours. |
+
+> **Error handling note:** Controller errors are passed to Express with
+> `next(error)`. Their final status and response body depend on the app's error
+> handling middleware; no custom error handler is defined in the current app.

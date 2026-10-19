@@ -1,76 +1,113 @@
-const mongoose = require('/mongoose');
+
+const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const captainSchema = new mongoose.Schema({
-  fullName: {
-    firstName:{
-      type: String,
-      required: true,
-      minLength: [3 , 'Firstname must be atleast 3 character long'],
+
+const captainSchema = new mongoose.Schema(
+  {
+    fullName: {
+      firstName: {
+        type: String,
+        required: true,
+        minlength: [3, 'First name must be at least 3 characters']
+      },
+      lastName: {
+        type: String,
+        required: true,
+        minlength: [3, 'Last name must be at least 3 characters']
+      }
     },
-    lastName: {
+
+    email: {
       type: String,
       required: true,
-      minLength: [3 , 'Lastname must be atleast 3 character long'],
+      unique: true,
+      lowercase: true,
+      trim: true,
+      match: [/^\S+@\S+\.\S+$/, 'Please enter a valid email']
+    },
+
+    password: {
+      type: String,
+      required: true,
+      select: false
+    },
+
+    socketId: {
+      type: String,
+      default: null
+    },
+
+    status: {
+      type: String,
+      enum: ['active', 'inactive'],
+      default: 'inactive'
+    },
+
+    vehicle: {
+      color: {
+        type: String,
+        required: true,
+        minlength: [3, 'Color must be at least 3 characters']
+      },
+      plate: {
+        type: String,
+        required: true,
+        minlength: [3, 'Plate must be at least 3 characters']
+      },
+      model: {
+        type: String,
+        required: true,
+        minlength: [3, 'Vehicle model must be at least 3 characters']
+      },
+      capacity: {
+        type: Number,
+        required: true,
+        min: [1, 'Capacity must be at least 1']
+      },
+      vehicleType: {
+        type: String,
+        required: true,
+        enum: ['car', 'bike', 'van']
+      }
+    },
+
+    location: {
+      lat: Number,
+      long: Number
     }
   },
-  email: {
-    type: String,
-    required: true,
-    unique: true,  
-    lowercase: true,
-    match: [/\S+@\S+\.\S+/, 'Please use a valid email address'],
-  },
-  socketId: {
-    type: String,
-  },
-  status: {
-    type: String,
-    enum: ['active' , 'inactive'],
-    default: 'inactive',
-  },
-  vehicle:{
-    color: {
-      type: String,
-      required: true,
-      minLength: [3 , 'Color must be atleast 3 character long'],
-    },
-    plate: {
-      type: String,
-      required: true,
-      minLength: [3 , 'Plate must be atleast 3 character long'],  
-    },
-    model: {
-      type: String,
-      required: true,
-      minLength: [3 , 'Model must be atleast 3 character long'],
-    },
-    capacity: {
-      type: Number,
-      required: true,
-      min: [1 , 'Capacity must be atleast 1'],  
-    },
-    vehicleType: {
-      type: String,
-      required: true,
-      enum: ['car' , 'bike' , 'van'], 
-    }
-  },
-  location:{
-    lat:{
-      type: Number,
-    },
-    long:{
-      type: Number,
-    }
+  { timestamps: true }
+);
+
+// Hash password before saving.
+captainSchema.pre('save', async function () {
+  if (!this.isModified('password')) return;
+
+  this.password = await bcrypt.hash(this.password, 10);
+});
+
+// Optional helper for hashing a password manually.
+captainSchema.statics.hashPassword = async function (password) {
+  return bcrypt.hash(password, 10);
+};
+
+// Compare login password with stored password hash.
+captainSchema.methods.comparePassword = async function (password) {
+  return bcrypt.compare(password, this.password);
+};
+
+// Generate JWT token.
+captainSchema.methods.generateAuthToken = function () {
+  if (!process.env.JWT_SECRET) {
+    throw new Error('JWT_SECRET is not configured');
   }
-})
-captainSchema.methods.generateAuthTokens = function() {
- const token = jwt.sign({ id: this._id }, 'process.env.JWT_SECRET', { expiresIn: '1d' });
- return token;
-}
-captainSchema.methods.comparePassword = async function(password) {
-  return await bcrypt.compare(password, this.password);
-}
-const capatainModel = mongoose.model('Captain' , CaptainSchema);
-module.exports = capatainModel;
+
+  return jwt.sign(
+    { id: this._id.toString() },
+    process.env.JWT_SECRET,
+    { expiresIn: '1d' }
+  );
+};
+
+module.exports = mongoose.model('Captain', captainSchema);
