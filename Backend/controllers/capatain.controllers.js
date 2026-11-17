@@ -159,9 +159,14 @@ module.exports.logoutCaptain = async (req, res, next) => {
       sameSite: 'lax'
     });
 
-    return res.status(200).json({
-      message: 'Captain logged out successfully'
-    });
+  return res.status(200).json({
+  captain: {
+    _id: req.captain._id,
+    fullName: req.captain.fullName,
+    email: req.captain.email,
+    vehicle: req.captain.vehicle,
+  },
+});
   } catch (error) {
     return next(error);
   }

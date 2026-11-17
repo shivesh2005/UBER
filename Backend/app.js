@@ -1,18 +1,40 @@
-const dotenv = require("dotenv");
-dotenv.config();
+
 const express = require('express');
 const cors = require('cors');
-const app = express();
 const cookieParser = require('cookie-parser');
-const connectToDb = require("./db/db");
+
+// Import routes
 const userRoutes = require('./routes/user.routes');
-connectToDb();
-app.use(cors());
+const placeRoutes = require('./routes/place.routes');
+
+// Keep captain routes if this file exists
+// const captainRoutes = require('./routes/captain.routes');
+
+const app = express();
+
+// CORS CONFIGURATION
+app.use(cors({
+    origin: 'http://localhost:5173',
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
+// MIDDLEWARE
 app.use(express.json());
-app.use(express.urlencoded({extended : true}));
+app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
-app.get('/', (req , res ) => {
-  res.send('Hello WOrld');
+
+// API ROUTES
+app.use('/users', userRoutes);
+app.use('/places', placeRoutes);
+
+// Uncomment if you have captain routes
+// app.use('/captains', captainRoutes);
+
+// TEST ROUTE
+app.get('/', (req, res) => {
+    res.send('Uber Clone Backend is running!');
 });
-app.use('/users' , userRoutes);
+
 module.exports = app;

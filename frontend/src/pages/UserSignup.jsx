@@ -1,124 +1,146 @@
+import { useContext, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import api, {
+  getApiErrorMessage,
+  saveLoginSession,
+} from '../lib/api';
+import { UserDataContext } from '../context/UserContext';
 
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
-
-const UserSignup = () => {
+function UserSignup() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [userData, setUserData] = useState({});
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [, setUser] = useContext(UserDataContext);
+  const navigate = useNavigate();
 
-  const submitHandler = (e) => {
-    e.preventDefault();
+  const submitHandler = async (event) => {
+    event.preventDefault();
+    setError('');
 
-    const data = {
-      fullName: {
-        firstName,
-        lastName,
-      },
-      email,
-      password,
-    };
+    if (firstName.trim().length < 3 || lastName.trim().length < 3) {
+      setError('First and last names must be at least 3 characters.');
+      return;
+    }
 
-    setUserData(data);
-    console.log('Signup Data:', data);
+    setLoading(true);
+
+    try {
+      const { data } = await api.post('/users/register', {
+        fullName: {
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
+        },
+        email: email.trim(),
+        password,
+      });
+
+      if (!data?.user || !data?.token) {
+        throw new Error('The server returned an incomplete registration response.');
+      }
+
+      const profile = { ...data.user };
+      delete profile.password;
+      setUser(profile);
+      saveLoginSession(data.token, 'user');
+      navigate('/home');
+    } catch (requestError) {
+      setError(
+        getApiErrorMessage(
+          requestError,
+          requestError instanceof Error
+            ? requestError.message
+            : 'Registration failed. Please try again.'
+        )
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div className="p-7 h-screen flex flex-col justify-between">
-      <div>
-        <img
-          className="w-16 mb-10"
-          src="https://upload.wikimedia.org/wikipedia/commons/c/cc/Uber_logo_2018.png"
-          alt="Uber"
-        />
-
+    <main className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-between p-7">
+      <section>
+        <Link to="/" className="mb-8 inline-block text-2xl font-bold">
+          Uber
+        </Link>
         <form onSubmit={submitHandler}>
-          <h3 className="text-lg font-medium mb-2">
-            What's your name?
-          </h3>
-
-          <div className="flex gap-4 mb-5">
-            <input
-              required
-              className="bg-[#eeeeee] w-1/2 rounded px-4 py-2 border text-lg placeholder:text-base"
-              type="text"
-              placeholder="First name"
-              value={firstName}
-              onChange={(e) => setFirstName(e.target.value)}
-            />
-
-            <input
-              required
-              className="bg-[#eeeeee] w-1/2 rounded px-4 py-2 border text-lg placeholder:text-base"
-              type="text"
-              placeholder="Last name"
-              value={lastName}
-              onChange={(e) => setLastName(e.target.value)}
-            />
+          <h1 className="mb-6 text-2xl font-bold">Create your account</h1>
+          <div className="mb-5 flex gap-3">
+            <label className="w-1/2 text-sm font-medium">
+              First name
+              <input
+                required
+                minLength={3}
+                autoComplete="given-name"
+                value={firstName}
+                onChange={(event) => setFirstName(event.target.value)}
+                className="mt-2 w-full rounded border bg-neutral-100 px-3 py-3" />
+            </label>
+            <label className="w-1/2 text-sm font-medium">
+              Last name
+              <input
+                required
+                minLength={3}
+                autoComplete="family-name"
+                value={lastName}
+                onChange={(event) => setLastName(event.target.value)}
+                className="mt-2 w-full rounded border bg-neutral-100 px-3 py-3" />
+            </label>
           </div>
-
-          <h3 className="text-lg font-medium mb-2">
-            What's your email?
-          </h3>
-
-          <input
-            required
-            className="bg-[#eeeeee] mb-5 rounded px-4 py-2 border w-full text-lg placeholder:text-base"
-            type="email"
-            placeholder="email@example.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            autoComplete="email"
-          />
-
-          <h3 className="text-lg font-medium mb-2">
-            Enter Password
-          </h3>
-
-          <input
-            required
-            minLength={8}
-            className="bg-[#eeeeee] mb-5 rounded px-4 py-2 border w-full text-lg placeholder:text-base"
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            autoComplete="new-password"
-          />
-
+          <label className="mb-5 block text-sm font-medium">
+            Email
+            <input
+              required
+              type="email"
+              autoComplete="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              className="mt-2 w-full rounded border bg-neutral-100 px-4 py-3"
+              placeholder="email@example.com" />
+          </label>
+          <label className="mb-5 block text-sm font-medium">
+            Password
+            <input
+              required
+              type="password"
+              minLength={6}
+              autoComplete="new-password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              className="mt-2 w-full rounded border bg-neutral-100 px-4 py-3"
+              placeholder="At least 6 characters" />
+          </label>
+          {error && (
+            <p className="mb-4 text-sm text-red-700" role="alert">
+              {error}
+            </p>
+          )}
           <button
             type="submit"
-            className="bg-[#111] text-white font-semibold mb-5 rounded px-4 py-2 w-full text-lg"
+            disabled={loading}
+            className="w-full rounded bg-black px-4 py-3 font-semibold text-white disabled:opacity-50"
           >
-            Create Account
+            {loading ? 'Creating account…' : 'Create account'}
           </button>
         </form>
-
-        <p className="text-center text-sm">
+        <p className="mt-5 text-center text-sm">
           Already have an account?{' '}
-          <Link to="/login" className="text-blue-600">
-            Login
+          <Link to="/login" className="font-semibold underline">
+            Sign in
           </Link>
         </p>
-      </div>
-
-      <div>
-        <Link
-          to="/captain-login"
-          className="bg-[#10b461] flex items-center justify-center text-white font-semibold mb-3 rounded px-4 py-2 w-full text-lg"
-        >
-          Sign in as Captain
-        </Link>
-
-        <p className="text-xs text-gray-500 text-center leading-5">
-          By continuing, you agree to our Terms of Service and
-          acknowledge our Privacy Policy.
-        </p>
-      </div>
-    </div>
+      </section>
+      <Link
+        to="/captain-signup"
+        className="mt-8 rounded bg-emerald-600 px-4 py-3 text-center font-semibold text-white"
+      >
+        Create a captain account
+      </Link>
+    </main>
   );
-};
+}
 
 export default UserSignup;

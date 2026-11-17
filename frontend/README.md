@@ -1,99 +1,53 @@
-# UBER Frontend
+# Uber Frontend
 
-This is the frontend for the UBER ride-booking app built with React, Vite, and Tailwind CSS.
+React, Vite, and Tailwind CSS client for rider and captain account flows.
 
-## Overview
+## Requirements
 
-The app includes user and captain authentication flows, route-based navigation, and a shared user context for storing user data across the app.
+- Node.js compatible with the Vite version in `package.json`
+- The backend API running locally or at a configured API URL
 
-## Tech Stack
+## Setup
 
-- React 19
-- Vite
-- React Router DOM
-- Tailwind CSS
-- PostCSS
-- Oxlint
-
-## Project Structure
-
-```bash
-frontend/
-├── public/
-├── src/
-│   ├── assets/
-│   ├── context/
-│   │   └── UserContext.jsx
-│   ├── pages/
-│   │   ├── Home.jsx
-│   │   ├── UserLogin.jsx
-│   │   ├── UserSignup.jsx
-│   │   ├── CaptainLogin.jsx
-│   │   └── CaptainSignup.jsx
-│   ├── App.jsx
-│   ├── App.css
-│   ├── index.css
-│   └── main.jsx
-├── index.html
-├── package.json
-├── vite.config.js
-├── tailwind.config.js
-├── postcss.config.js
-├── .gitignore
-├── README.md
-└── .oxlintrc.json
-```
-
-## Application Routes
-
-The app uses `BrowserRouter` and defines these routes in `src/App.jsx`:
-
-- `/` → Home page
-- `/login` → User login
-- `/signup` → User signup
-- `/Captain-Login` → Captain login
-- `/Captain-Signup` → Captain signup
-
-## Authentication Flow
-
-- A shared `UserContext` stores user state using React context.
-- The frontend is structured for separate user and captain authentication screens.
-- User-related data is managed through the context provider at `src/context/UserContext.jsx`.
-
-## Getting Started
-
-### Install dependencies
+Install dependencies and run the development server:
 
 ```bash
 npm install
-```
-
-### Run the development server
-
-```bash
 npm run dev
 ```
 
-Then open the local Vite URL shown in the terminal, usually:
+Set `VITE_BASE_URL` in a local `.env` file to the backend origin when it is not
+available at `http://localhost:3000`:
 
-```bash
-http://localhost:5173
+```env
+VITE_BASE_URL=http://localhost:3000
 ```
 
-## Build for Production
+Do not include endpoint paths such as `/users` in this value. The frontend
+appends the relevant API paths.
+
+## Routes
+
+| Path | Page |
+| --- | --- |
+| `/` | Welcome page |
+| `/login` | Rider sign in |
+| `/signup` | Rider account registration |
+| `/captain-login` | Captain sign in |
+| `/captain-signup` | Captain registration |
+| `/home` | Session-protected account landing page |
+
+Authentication responses are held in React memory for the current page session.
+Protected requests send the returned JWT as a Bearer token. Refreshing the page
+clears the in-memory session and requires signing in again.
+
+## Validation
 
 ```bash
+npm run lint
 npm run build
 ```
 
-## Preview Production Build
-
-```bash
-npm run preview
-```
-
-## Notes
-
-- This frontend is designed to connect with the backend API for login/signup and rider/captain flows.
-- Tailwind is configured and ready for styling the app.
-- The project is currently a React frontend shell and can be extended with additional dashboard, booking, and driver-management pages.
+Tailwind class suggestions are provided by the VS Code Tailwind CSS IntelliSense
+extension. Tailwind scans `index.html` and files under `src/` as configured in
+`tailwind.config.js`.
